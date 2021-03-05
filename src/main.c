@@ -346,8 +346,9 @@ struct BmpInfo{
   uint32_t  biClrUsed;      // важно только для сжатых картинок
   uint32_t  biClrImportant; // важно только для сжатых картинок
 }__attribute__((packed));
-void save(char *filename){
+char save(char *filename){
   FILE *pf = fopen(filename, "wb");
+  if(pf == NULL)return 0;
   uint16_t buf[wnd_w*wnd_h];
   //bmp_w_m
   struct BmpHeader header = {
@@ -376,6 +377,7 @@ void save(char *filename){
   fwrite(buf, sizeof(buf), 1, pf);
   
   fclose(pf);
+  return 1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -450,7 +452,11 @@ void sbtn_click(GtkButton *button, gpointer user_data){
     glFlush();
     i++;
     sprintf(&fname[namelen], "%04d.bmp", i);
-    save(fname);
+    if( !save(fname) ){
+      fprintf(stderr, "Can not write file [%s]\n", fname);
+      i = -1;
+      break;
+    }
     printf("[%s] saved\n", fname);
   }
   
@@ -458,8 +464,10 @@ void sbtn_click(GtkButton *button, gpointer user_data){
   SDL_SetWindowSize(wnd_sdl, wnd_w, wnd_h);
   
   free(fname);
-  printf("Now you can run 'convert %s*.bmp -fuzz 10%% -layers Optimize res.gif' to convert this into res.gif\n", str);
-  printf("Or 'ffmpeg -loop 1 -t 60 -framerate 7 -i %s%%4d.bmp res.mov' to convert into res.mov\n", str);
+  if(i >= 0){
+    printf("Now you can run 'convert %s*.bmp -fuzz 10%% -layers Optimize res.gif' to convert this into res.gif\n", str);
+    printf("Or 'ffmpeg -loop 1 -t 60 -framerate 7 -i %s%%4d.bmp res.mov' to convert into res.mov\n", str);
+  }
 }
 
 int main( int argc, char *argv[]){
