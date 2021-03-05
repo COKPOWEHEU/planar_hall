@@ -237,7 +237,7 @@ void draw_graph(double H, char rise){
   double alpha = H_angle_deg*M_PI/180;
   double IAangle = current_angle_deg*M_PI/180;
   double beta = calc_angle(alpha, H, rise);
-  glMatrixMode(GL_PROJECTION);
+  /*glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   gluOrtho2D(-field_max,field_max, -M_PI, M_PI);
   glColor3f(0,1,0);
@@ -249,7 +249,7 @@ void draw_graph(double H, char rise){
     double bet = calc_angle(alpha, fr, rise);
     glVertex2f(fr, bet);
   }
-  glEnd();
+  glEnd();*/
   
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -287,14 +287,14 @@ void draw_graph(double H, char rise){
     glVertex2f(H-w, sinbeta);
     glVertex2f(H, sinbeta+h);
   glEnd();
-  glColor4f(0,1,0,1);
+  /*glColor4f(0,1,0,1);
   glBegin(GL_LINE_STRIP);
     glVertex2f(H, beta+h);
     glVertex2f(H+w, beta);
     glVertex2f(H, beta-h);
     glVertex2f(H-w, beta);
     glVertex2f(H, beta+h);
-  glEnd();
+  glEnd();*/
 }
 
 //отрисовка вообще всего
