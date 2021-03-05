@@ -369,7 +369,10 @@ char save(char *filename){
     .biClrUsed = 0, //?
     .biClrImportant = 0, //?
   };
-  
+#ifdef _WIN32
+  //костыль для mingw
+  #define GL_UNSIGNED_SHORT_5_6_5 0x8363
+#endif
   glReadPixels(0, 0, wnd_w, wnd_h, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, &buf);
   
   fwrite(&header, sizeof(header), 1, pf);
@@ -464,10 +467,13 @@ void sbtn_click(GtkButton *button, gpointer user_data){
   SDL_SetWindowSize(wnd_sdl, wnd_w, wnd_h);
   
   free(fname);
+#ifndef _WIN32
+  //кажется, imagemagick и ffmpeg под винду устанавливают редко
   if(i >= 0){
     printf("Now you can run 'convert %s*.bmp -fuzz 10%% -layers Optimize res.gif' to convert this into res.gif\n", str);
     printf("Or 'ffmpeg -loop 1 -t 60 -framerate 7 -i %s%%4d.bmp res.mov' to convert into res.mov\n", str);
   }
+#endif
 }
 
 int main( int argc, char *argv[]){
@@ -533,6 +539,9 @@ int main( int argc, char *argv[]){
   
   GtkWidget *bmpname = gtk_entry_new();
   gtk_entry_set_text((GtkEntry*)(bmpname), "bmp/a");
+#ifdef _WIN32
+  gtk_entry_set_text((GtkEntry*)(bmpname), "../bmp/a");
+#endif
   gtk_fixed_put(GTK_FIXED(fixed), bmpname, 0, 200);
   GtkWidget *sbtn = gtk_button_new_with_label("Save");
   g_signal_connect(G_OBJECT(sbtn), "clicked", G_CALLBACK(sbtn_click), bmpname);

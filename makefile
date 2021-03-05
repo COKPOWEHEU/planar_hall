@@ -10,10 +10,8 @@ CXXFLAGS = $(CFLAGS) -std=c++11
 LDFLAGS = -lm -lSDL2
 
 # Выбор архитектуры
-#arch := arch_lin32
 arch := arch_lin64
 #arch := arch_win32
-#arch := arch_win64
 
 # Выбор режима
 mode := mode_debug
@@ -39,29 +37,22 @@ _divider_ = _.~№!I_hope_there_will_not_be_this_string_in_flags_or_file_names!�
 SPACE := $(subst O_O, ,O_O)
 
 compiler =	$(_flagdiv_)arch_win32 i686-w64-mingw32- -win32\
-		$(_flagdiv_)arch_win64 x86_64-w64-mingw32- -win32\
 		
 		
-spec_cflags  =	$(_flagdiv_)arch_lin32 -m32 -isystem /usr/include `pkg-config --cflags gtk+-3.0`
-spec_cflags +=	$(_flagdiv_)arch_lin64 `pkg-config --cflags gtk+-3.0` 
-spec_cflags +=	$(_flagdiv_)arch_win32 -I./mingw/ `PKG_CONFIG_SYSROOT_DIR=./mingw PKG_CONFIG_PATH=./mingw/lib/pkgconfig i686-w64-mingw32-pkg-config --cflags gtk+-3.0`
+spec_cflags  =	$(_flagdiv_)arch_lin64 `pkg-config --cflags gtk+-3.0` 
+spec_cflags +=	$(_flagdiv_)arch_win32 -I./mingw/ `PKG_CONFIG_SYSROOT_DIR=./mingw PKG_CONFIG_PATH=./mingw/lib/pkgconfig i686-w64-mingw32-pkg-config --cflags gtk+-3.0` -I./mingw/include/
 #FIX pkg-config:
 # $ ln -s ./ MinGW
 # $ mkdir -p usr/i686-w64-mingw32/sys-root/
 # $ ln -s ../../../ usr/i686-w64-mingw32/sys-root/mingw
-spec_cflags +=	$(_flagdiv_)arch_win64 
-		
-spec_ldflags  =	$(_flagdiv_)arch_lin32 -m32 -B/usr/lib/gcc/i686-linux-gnu/6 `pkg-config --libs gtk+-3.0`
-spec_ldflags +=	$(_flagdiv_)arch_lin64 `pkg-config --libs gtk+-3.0` -lGL -lGLU
-spec_ldflags +=	$(_flagdiv_)arch_win32 -static-libgcc -static-libstdc++ -lgdi32 -mconsole -mwindows -lmingw32 `PKG_CONFIG_PATH=./mingw/lib/pkgconfig i686-w64-mingw32-pkg-config --define-variable=prefix=./mingw --libs gtk+-3.0`
-spec_ldflags +=	$(_flagdiv_)arch_win64 -static-libgcc -static-libstdc++ -lmingw32 -lSDL2main -lopengl32 -lgdi32 -mconsole -mwindows
+spec_ldflags  =	$(_flagdiv_)arch_lin64 `pkg-config --libs gtk+-3.0` -lGL -lGLU
+spec_ldflags +=	$(_flagdiv_)arch_win32 -lmingw32 -lSDL2main -lopengl32 -lglu32 -lgdi32 -mconsole -mwindows -lSDL2 -static-libgcc -static-libstdc++ `PKG_CONFIG_PATH=./mingw/lib/pkgconfig i686-w64-mingw32-pkg-config --define-variable=prefix=./mingw --libs gtk+-3.0` -L./mingw/lib/
+
 
 res_flags =	$(_flagdiv_)mode_debug -gdwarf-2
 
-prognames =	arch_lin32$(_divider_)32\
-		arch_lin64$(_divider_)64\
+prognames =	arch_lin64$(_divider_)64\
 		arch_win32$(_divider_)32.exe\
-		arch_win64$(_divider_)64.exe\
 
 #Еще черная магия с подстановками. Рассмотрим на примере CFLAGS с добавлением псевдо-переменных
 # VAR_A = $(subst $(SPACE),$(_divider_),$(spec_cflags)) - заменяем в исходной строке пробелы на $(_divider_). Теперь пробелов в строке нет
@@ -85,22 +76,19 @@ objects = $(addprefix build/,$(addsuffix .$(arch).o,$(files)))
 all:	$(objects)
 	mkdir -p res
 	$(CXX) $(objects) $(LDFLAGS) -o $(resname)
-remake: clean all
+	
+exe:
+	make -j 10 arch=arch_win32
+	cp res/prog32.exe mingw_dll/planar_hall.exe
+
 clean:
 	rm -f $(objects)
 	rm -f $(resname)
 	rm -rf build/dep
-release:	allarch
-	rm -rf build
 	
 cleanall:
 	rm -rf build
-	rm -f $(progname)*
-allarch:
-#	make -r -j 10 arch=arch_lin32
-	make -r -j 10 arch=arch_lin64
-	make -r -j 10 arch=arch_win32
-	make -r -j 10 arch=arch_win64
+	rm -rf res
 
 build/%.$(arch).o: $(srcdir)/%.c
 	mkdir -p build
