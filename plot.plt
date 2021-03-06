@@ -9,16 +9,24 @@ set key right bottom
 
 set xlabel "H" # font "Helvetica,20"
 set ylabel "{/Symbol f}, deg" # font "Helvetica,20"
-set y2label "sin (2 {/Symbol f})"
-set grid
+set y2label "sin (2{/Symbol f})"
+
+#set grid
+set grid xtics lc "grey" lw 1 lt 1
+set grid ytics lc "grey" lw 1 lt 1
+#set grid mytics lc "grey" lw 1 lt 1
+
 #set xrange [-0.02:0.02]
 
-alp_deg = 70 #угол между легкой осью и внешним полем
+alp_deg = 60 #угол между легкой осью и внешним полем
 bet_deg = 30 #угол между легкой осью и током
-Ha = 100
+Ha = 200
 
 set xrange [-1000:1000]
-
+set yrange [-360:180]
+set ytics 90
+set mytics 2
+set y2tics 1
 
 alp = alp_deg*pi/180
 bet = bet_deg*pi/180
@@ -28,6 +36,6 @@ phi2(x, Ha) = (phi(x, Ha)>-pi ? phi(x, Ha) : phi(x, Ha)+2*pi)
 plot -( phi2(x, Ha) )*180/pi axis x1y1 title "{/Symbol f}_+" with lines lc "red"   lw 2, \
      -sin(2*( phi(x, Ha)))  axis x1y2 title "sin(2{/Symbol f}_+)" with linespoints lc "red"   lw 2 pt 2 ps 2 pi 5, \
      -(phi(x, -Ha)*180/pi) axis x1y1 title "{/Symbol f}_-" with lines lc "green" lw 2, \
-     -sin(2*( phi(x, -Ha))) axis x1y2 title "sin(2{/Symbol f}_-)" with linespoints lc "green" lw 2 pt 6 ps 2 pi 5 \
-     
+     -sin(2*( phi(x, -Ha))) axis x1y2 title "sin(2{/Symbol f}_-)" with linespoints lc "green" lw 2 pt 6 ps 2 pi 5, \
+     -(phi(x, -Ha)*180/pi)-360 axis x1y1 notitle with lines lc "green" lw 2 \
      

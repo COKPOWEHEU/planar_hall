@@ -529,7 +529,7 @@ int main( int argc, char *argv[]){
   g_signal_connect(G_OBJECT(hc), "value-changed", G_CALLBACK(spined_OnChange), &Hc);
   gtk_fixed_put(GTK_FIXED(fixed), hc, 200, 120);
   
-  GtkWidget *anlabel = gtk_label_new("Anizotropy field");
+  GtkWidget *anlabel = gtk_label_new("Anisotropy field");
   gtk_fixed_put(GTK_FIXED(fixed), anlabel, 0, 160);
   GtkWidget *an = gtk_spin_button_new_with_range(0, 10000, 1);
   gtk_spin_button_set_update_policy(GTK_SPIN_BUTTON(an), GTK_UPDATE_IF_VALID);
