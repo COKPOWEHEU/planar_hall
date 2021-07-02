@@ -15,290 +15,37 @@
 SDL_Window *wnd_sdl;
 SDL_GLContext context;
 volatile char exitflag = 0;
-int wnd_w = 500; //ширина окна (в пикселях)
+int wnd_w = 700; //ширина окна (в пикселях)
 int wnd_h = 900; //высота окна (в пикселях)
 
-int bmp_w = 500; //ширина bmp (в пикселях)
-int bmp_h = 1000; //высота bmp (в пикселях)
+int bmp_w = 450; //ширина bmp (в пикселях)
+int bmp_h = 600; //высота bmp (в пикселях)
 double bmp_w_m = 0.1; //ширина bmp (в метрах)
 
 const double field_max = 1000; //максимальное внешнее поле
-double Hc = 400; //коэрцитивная сила
-double Haniz = 300; //поле анизотропии
+double Hc = 40; //коэрцитивная сила
+double Haniz = 100; //поле анизотропии
 double dfield = 2; //шаг анимации по полю
 double H_angle_deg = 70; //угол между легкой осью и внешним полем (градусов)
 double current_angle_deg = -30; //угол между легкой осью и направлением тока (градусов)
-const double linewidth = 2;
-char marker_flag = 1;
 
-struct{
-  float min, max;
-}magen;
-
-double calc_p(double H){
-  return H/Haniz;
-}
-double mag_energy(double phi, double alp, double p){
-  return -p*cos(phi-alp) - cos(phi)*cos(phi);
-}
-
-#define NPOINTS 3600
-double yval[NPOINTS+1];
-double min, max;
-int idxmin1, idxmin2;
-#define XPOINTS 2000
-double minangle[XPOINTS][2];
-#define INV_FIELD 1
-
-void findmin2(float alp){
-  double min;
-  int ires = 0;
-  if((idxmin1 > NPOINTS/4) && (idxmin1 < 3*NPOINTS/4)){
-    ires = 0; min = yval[ires];
-    for(int i=0; i<NPOINTS/4+2; i++){
-      if(yval[i] < min){min = yval[i]; ires=i;}
-    }
-    for(int i=3*NPOINTS/4 - 1; i<NPOINTS; i++){
-      if(yval[i] < min){min = yval[i]; ires=i;}
-    }
-    if((ires > NPOINTS/4) && (ires < 3*NPOINTS/4)){idxmin2=idxmin1; return;}
-  }else{
-    ires = NPOINTS/4-1; min = yval[ires];
-    min = yval[ires];
-    for(int i=NPOINTS/4; i<3*NPOINTS/4 + 2; i++){
-      if(yval[i] < min){min = yval[i]; ires=i;}
-    }
-    if((ires < NPOINTS/4) || (ires > 3*NPOINTS/4)){idxmin2=idxmin1; return;}
-  }
-  idxmin2=ires;
-}
-void calc_points(float alp, double p){
-  double x;
-  if(p < 0){alp+=M_PI; p=-p;}
-  idxmin1 = 0;
-  min = max = mag_energy(0, alp, p);
-  for(int i=0; i<NPOINTS+1; i++){
-    x = i * 2*M_PI/NPOINTS;
-    yval[i] = mag_energy(x, alp, p);
-    if(yval[i] < min){min = yval[i]; idxmin1=i;}
-    if(yval[i] > max)max = yval[i];
-  }
-  findmin2(alp);
-}
+//Расчет угла между вектором намагниченности и легкой осью
+//  alp - угол между внешним полем и легкой осью
+//  H - величина внешнего поля
+//  rise - направление поля (1-нарастает в положительную сторону, 0-в отрицательную), для получения гистерезиса
 double calc_angle(float alp, double H, char rise){
-  int idx = idxmin1;
-  if(rise){
-    if((H > 0) && (H < Hc))idx = idxmin2;
+  double Hx, Hy;
+  Hx = H*cos(alp);
+  Hy = H*sin(alp);
+  char rise_flag = rise;
+  if(cos(alp)<0)rise_flag = !rise_flag; //если знак поля меняется из-за угла, надо проигнорировать
+  if(rise_flag){
+    if(Hx > Hc)Hx += Haniz; else Hx -= Haniz;
   }else{
-    if((H < 0) && (H >-Hc))idx = idxmin2;
+    if(Hx <-Hc)Hx -= Haniz; else Hx += Haniz;
   }
-  return idx*2*M_PI/NPOINTS;
-}
-
-void draw_ring(float x, float y, float r, int N){
-  float alp;
-  glBegin(GL_LINE_STRIP);
-  for(int i=0; i<=N; i++){
-    alp = 2*M_PI*i/N;
-    glVertex2f(x+r*cos(alp), y+r*sin(alp));
-  }
-  glEnd();
-}
-void draw_surface(float alp){
-  glPushMatrix();
-  double xmin = 2*M_PI*idxmin1/NPOINTS;
-  double amin = 2*M_PI*idxmin2/NPOINTS;
-  double dy = max - min;
-  double minval = min - dy*0.2;
-  dy = max - minval;
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(-dy,dy, -dy,dy);
-  glLineWidth(linewidth);
-  glBegin(GL_LINES);
-    glColor3f(1,0,0);
-    glVertex2f(0,0);
-    glVertex2f(dy*cos(alp), dy*sin(alp));
-    glColor3f(0,0,1);
-    glVertex2f(0,0);
-    glVertex2f(dy*cos(amin), dy*sin(amin));
-    glColor3f(0,1,0);
-    glVertex2f(0,0);
-    glVertex2f(dy*cos(xmin), dy*sin(xmin));
-  glEnd();
-  glColor3f(0,0,0);
-  glBegin(GL_LINE_STRIP);
-    double bet;
-    for(int i=0; i<NPOINTS+1; i++){
-      bet = 2*M_PI*i/NPOINTS;
-      glVertex2f((yval[i]-minval)*cos(bet), (yval[i]-minval)*sin(bet));
-    }
-  glEnd();
-  
-  glLineWidth(1);
-  
-  glPopMatrix();
-}
-void draw_surface_lin(){
-  glPushMatrix();
-  //magen = [-p-1 .. p]
-  float max = calc_p(field_max);
-  float min = -max-1;
-  //max=0;
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(0,NPOINTS, min,max);
-  glLineWidth(1);
-
-  glColor3f(0,0,0);
-  glBegin(GL_LINE_STRIP);
-    for(int i=0; i<NPOINTS+1; i++){
-      glVertex2f(i, yval[i]);
-    }
-  glEnd();
-  glBegin(GL_LINES);
-    glColor3f(0, 0, 1);
-    glVertex2f(idxmin2 - NPOINTS/5, yval[idxmin2]);
-    glVertex2f(idxmin2 + NPOINTS/5, yval[idxmin2]);
-  
-    glColor3f(0, 1, 0);
-    glVertex2f(0, yval[idxmin1]);
-    glVertex2f(NPOINTS, yval[idxmin1]);
-    
-    
-  glEnd();
-  
-  glLineWidth(1);
-  
-  glPopMatrix();
-}
-
-//double mag_energy(double phi, double alp, double p)
-double findmin(double x1, double x2, double alp, double p){
-  if(p<0){alp+=M_PI; p=-p;}
-  if(x1 > x2){double temp = x1; x1=x2; x2=temp;}
-  double dx = (x2-x1)/100;
-  if((x2-x1) < 0.01)return (x1+x2)/2;
-  double min, xmin;
-  double x;
-  double y;
-  xmin = x = x1-dx/2; min = mag_energy(x, alp, p);
-  for(x=x1; x<=x2+dx/2; x+=dx){
-    y = mag_energy(x, alp, p);
-    if(y<min){min=y; xmin=x;}
-  }
-  if((xmin < x1)||(xmin>x2))return xmin;
-  return findmin(xmin-dx, xmin+dx, alp, p);
-}
-double findlocalmin(double alp, double p, double xmin){
-  double res;
-  if((xmin > M_PI/2) && (xmin < 3*M_PI/2)){
-    res = findmin(-M_PI/2, M_PI/2, alp, p);
-    if((res < -M_PI/2) || (res>M_PI/2))return xmin;
-    if(res < 0)res+=2*M_PI;
-  }else{
-    res = findmin(M_PI/2, 3*M_PI/2, alp, p);
-    if((res <M_PI/2)||(res>3*M_PI/2))return xmin;
-  }
-  return res;
-}
-
-void calc_graph(){
-  int i=0;
-  double alp = H_angle_deg*M_PI/180;
-  char sign = 1;
-  if(cos(alp)<0)sign=-1;
-  double p = calc_p((i-XPOINTS/2)*field_max*2/XPOINTS);
-
-  for(i=0; i<XPOINTS; i++){
-    p = calc_p((i-XPOINTS/2)*field_max*2/XPOINTS);
-    if(sign*p > 0){
-      minangle[i][0] = findmin(-M_PI/2, M_PI/2, alp, p);
-      if(minangle[i][0] < 0)minangle[i][0] += 2*M_PI;
-    }else{
-      minangle[i][0] = findmin(M_PI/2, 3*M_PI/2, alp, p);
-    }
-    minangle[i][1] = findlocalmin(alp, p, minangle[i][0]);
-  }
-}
-
-void draw_graph(double H, char rise){
-  double IAangle = current_angle_deg*M_PI/180;
-  int dh = (wnd_h-wnd_w)/2;
-  
-  glViewport(0,wnd_w, wnd_w, dh);
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(0,1, 0,1);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  glColor3f(0.9, 0.9, 0.9);
-  glBegin(GL_TRIANGLE_FAN);
-    glVertex2f(0,0);
-    glVertex2f(0,1);
-    glVertex2f(1,1);
-    glVertex2f(1,0);
-  glEnd();
-  
-  draw_surface_lin();
-  
-  glViewport(0,wnd_w+dh, wnd_w, dh);
-  //glViewport(0,wnd_w, wnd_w, wnd_h-wnd_w);
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  //gluOrtho2D(0,XPOINTS, minangle_min, minangle_max);
-  gluOrtho2D(0, XPOINTS, -1.02, 1.02);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  glLineWidth(linewidth);
-  glColor3f(0,0,1);
-  glBegin(GL_LINE_STRIP);
-    for(int i=0; i<XPOINTS; i++)
-      glVertex2f(i, sin(2*(IAangle -minangle[i][1])));
-  glEnd();
-  glColor3f(0,0,0);
-  glBegin(GL_LINE_STRIP);
-    for(int i=0; i<XPOINTS; i++)
-      glVertex2f(i, sin(2*(IAangle -minangle[i][0])));
-  glEnd();
-  glColor3f(1,0,0);
-  int Hci = XPOINTS/2 - XPOINTS*Hc/field_max/2;
-  if(Hci > 0 && Hci < XPOINTS/2){
-    glBegin(GL_LINES);
-      glVertex2f(Hci, sin(2*(IAangle -minangle[Hci][0])));
-      glVertex2f(Hci, sin(2*(IAangle -minangle[Hci][1])));
-      glVertex2f(XPOINTS-Hci, sin(2*(IAangle -minangle[XPOINTS - Hci][0])));
-      glVertex2f(XPOINTS-Hci, sin(2*(IAangle -minangle[XPOINTS - Hci][1])));
-    glEnd();
-  }
-  glColor3f(0,0,0);
-  glLineWidth(1);
-  
-  if(marker_flag){
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluOrtho2D(-field_max, field_max, -1.02, 1.02);
-
-    int Hci = XPOINTS/2 - XPOINTS*H/field_max/2;
-    int minnum = 0;
-    if((H>-Hc) && (H<Hc)){
-      if(rise && (H>0))minnum = 1;
-      if(!rise &&(H<0))minnum = 1;
-    }
-    const float size = 40;
-    float dx = (size/wnd_w)*field_max/2;
-    float dy = (size/(wnd_h-wnd_w));
-    float y = sin(2*(IAangle -minangle[XPOINTS - Hci][minnum]));
-    glBegin(GL_LINE_STRIP);
-      glVertex2f(H-dx, y);
-      glVertex2f(H, y-dy);
-      glVertex2f(H+dx, y);
-      glVertex2f(H, y+dy);
-      glVertex2f(H-dx, y);
-    glEnd();
-  }
+  double bet = atan2(Hy, Hx);
+  return bet;
 }
 
 //Отрисовка "направления намагниченности" (стрелки компаса)
@@ -336,25 +83,13 @@ void draw_arrow(char dir_left){
   glColor4f(0, 0.5, 0.5, 0.8);
   glScalef(1, Haniz/field_max, 0);
   glBegin(GL_TRIANGLE_FAN);
-    glVertex2f(-fld_l+arrow_dl, -arrow_w);
-    glVertex2f(-fld_l+arrow_dl, -arrow_dw);
     glVertex2f(-fld_l, 0);
     glVertex2f(-fld_l+arrow_dl, arrow_dw);
     glVertex2f(-fld_l+arrow_dl, arrow_w);
-#if INV_FIELD
-    glVertex2f(+fld_l-arrow_dl, arrow_w);
-    glVertex2f(+fld_l-arrow_dl, -arrow_w);
-  glEnd();
-  glBegin(GL_TRIANGLE_FAN);
-    glVertex2f(+fld_l-arrow_dl, arrow_w);
-    glVertex2f(+fld_l-arrow_dl, arrow_dw);
-    glVertex2f(+fld_l, 0);
-    glVertex2f(+fld_l-arrow_dl, -arrow_dw);
-    glVertex2f(+fld_l-arrow_dl, -arrow_w);
-#else
     glVertex2f(fld_l, arrow_w);
     glVertex2f(fld_l, -arrow_w);
-#endif
+    glVertex2f(-fld_l+arrow_dl, -arrow_w);
+    glVertex2f(-fld_l+arrow_dl, -arrow_dw);
   glEnd();
   glPopMatrix();
 }
@@ -364,15 +99,15 @@ void draw_arrow(char dir_left){
 //  H - величина внешнего поля
 //  rise - флаг направления изменения поля (0-уменьшение, 1-увеличение)
 void draw_springs(float alp, float H, char rise){
-  /*H = H*cos(alp);
+  H = H*cos(alp);
   if(cos(alp) < 0)rise=!rise;
   char dir_left;
   if(rise){ //гистерезис
     if(H > Hc)dir_left = 0; else dir_left = 1;
   }else{
     if(H <-Hc)dir_left = 1; else dir_left = 0;
-  }*/
-  draw_arrow(0);
+  }
+  draw_arrow(dir_left);
 }
 
 //отрисовка внешнего поля (магнита)
@@ -380,11 +115,7 @@ void draw_springs(float alp, float H, char rise){
 //  fld - величина поля (дробное число от 0.0 до 1.0)
 const float fld_l = 0.7;
 void draw_field(float alp, float fld){
-#ifdef INV_FIELD
-  if(fld > 0){
-#else
   if(fld < 0){
-#endif
     fld = -fld;
     alp = alp+M_PI;
   }
@@ -495,16 +226,93 @@ void draw_model(double H, char rise){
   draw_field(ha, H/field_max);
   draw_compass(alp);
   draw_springs(ha, H, rise);
-  draw_surface(alp);
+}
+
+//отрисовка графиков
+//  H - величина внешнего поля
+//  rise - флаг направления изменения (0-уменьшение, 1-увеличение)
+void draw_graph(double H, char rise){
+  const float df = field_max/1000;
+  glViewport(0,wnd_w, wnd_w, wnd_h-wnd_w);
+  double alpha = H_angle_deg*M_PI/180;
+  double IAangle = current_angle_deg*M_PI/180;
+  double beta = calc_angle(alpha, H, rise);
+  /*glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluOrtho2D(-field_max,field_max, -M_PI, M_PI);
+  glColor3f(0,1,0);
+  glBegin(GL_LINE_STRIP);
+  for(float f = -field_max; f<3*field_max; f+= df){
+    float fr = f;
+    char rise = 1;
+    if(f > field_max){fr = 2*field_max - f; rise = 0;}
+    double bet = calc_angle(alpha, fr, rise);
+    glVertex2f(fr, bet);
+  }
+  glEnd();*/
+  
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluOrtho2D(-field_max,field_max, -1.05, 1.05);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  glColor3f(0,0,0);
+  glBegin(GL_LINE_STRIP);
+  for(float f = -field_max; f<3*field_max; f+= df){
+    float fr = f;
+    char rise = 1;
+    if(f > field_max){fr = 2*field_max - f; rise = 0;}
+    double bet = calc_angle(alpha, fr, rise);
+    //bet += IAangle;
+    bet = IAangle - bet;
+    bet = sin(2*bet);
+    glVertex2f(fr, bet);
+  }
+  glEnd();
+  const float size_abs = 10;
+  float w = size_abs*2*field_max/wnd_w;
+  float h = size_abs*2.1/(wnd_h-wnd_w);
+  float sinbeta = sin(2*(IAangle -  beta));
+  beta *= 1.05/M_PI;
+  glColor4f(0,0,0,0.5);
+  glBegin(GL_LINE_STRIP);
+    glVertex2f(H, -1.1);
+    glVertex2f(H, 1.1);
+  glEnd();
+  glColor4f(0,0,0,1);
+  glBegin(GL_LINE_STRIP);
+    glVertex2f(H, sinbeta+h);
+    glVertex2f(H+w, sinbeta);
+    glVertex2f(H, sinbeta-h);
+    glVertex2f(H-w, sinbeta);
+    glVertex2f(H, sinbeta+h);
+  glEnd();
+  /*glColor4f(0,1,0,1);
+  glBegin(GL_LINE_STRIP);
+    glVertex2f(H, beta+h);
+    glVertex2f(H+w, beta);
+    glVertex2f(H, beta-h);
+    glVertex2f(H-w, beta);
+    glVertex2f(H, beta+h);
+  glEnd();*/
 }
 
 //отрисовка вообще всего
 void draw(){
-  static double H = -field_max*1.2;
-  static char rise = 0;
+  static double H = -field_max;
+  static char rise = 1;
   double dH = dfield;
-  
-  calc_points(H_angle_deg*M_PI/180, calc_p(H));
+  double Hslow = Hc*2;
+  const double kslow = 0.3;
+  double Hp = fabs(H);
+  if( Hp < Hslow ){
+    if( Hp < Hc ){
+      dH = kslow;
+    }else{
+      dH = (Hp-Hc)/(Hslow-Hc)*(1-kslow)+kslow;
+    }
+    dH *= dfield;
+  }
   draw_model(H, rise);
   draw_graph(H, rise);
   if(rise){
@@ -512,7 +320,7 @@ void draw(){
     if(H >= field_max){H = field_max; rise = 0;}
   }else{
     H -= dH;
-    if(H <=-field_max){H =-field_max; rise = 1; calc_graph(); }
+    if(H <=-field_max){H =-field_max; rise = 1;}
   }
 }
 
@@ -591,7 +399,6 @@ void OnClose(void){
 void spined_OnChange(GtkWidget *obj, gpointer data){
   double *val = data;
   *val = gtk_spin_button_get_value(GTK_SPIN_BUTTON(obj));
-  calc_graph();
 }
 
 //колбэк на изменение полей ввода углов
@@ -603,7 +410,6 @@ void angle_OnChange(GtkWidget *obj, gpointer data){
   }else if(*val < -360){
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(obj), *val + 360);
   }
-  calc_graph();
 }
 
 //колбэк на нажатие клавиши 'Save'
@@ -611,6 +417,10 @@ void sbtn_click(GtkButton *button, gpointer user_data){
   double H = -field_max;
   char rise = 1;
   double dH = 50;
+  double dfield = 50;
+  double Hslow = Hc*2;
+  double Hp;
+  const double kslow = 0.3;
   const char *str = gtk_entry_get_text((GtkEntry*)user_data);
   size_t namelen = strlen(str);
   char *fname = malloc(sizeof(char) * (namelen + strlen("10000.bmp")));
@@ -624,15 +434,21 @@ void sbtn_click(GtkButton *button, gpointer user_data){
   int i = 0;
   while(1){
     glClear(GL_COLOR_BUFFER_BIT);
-    calc_points(H_angle_deg*M_PI/180, calc_p(H));
     draw_model(H, rise);
     draw_graph(H, rise);
+    Hp = fabs(H);
+    if( Hp < Hslow ){
+      if( Hp < Hc ){
+        dH = kslow;
+      }else{
+        dH = (Hp-Hc)/(Hslow-Hc)*(1-kslow)+kslow;
+      }
+      dH *= dfield;
+    }
     if(rise){
-      if( (H>-dH) && (H<Hc*1.5+dH) )H += dH/10; else
       H += dH;
       if(H >= field_max){H = field_max; rise = 0;}
     }else{
-      if( (H<dH) && (H>(-1.5*Hc-dH)) )H-=dH/10; else
       H -= dH;
       if(H<-field_max)break;
     }
@@ -660,103 +476,9 @@ void sbtn_click(GtkButton *button, gpointer user_data){
 #endif
 }
 
-#define StrEq(str, eq) (strncmp(str, eq, sizeof(eq)) == 0)
-void loadfile(char fname[]){
-  FILE *pf = fopen(fname, "rt");
-  if(pf == NULL){
-    fprintf(stderr, "Can not open file [%s]\n", fname); return;
-  }
-  char name[20];
-  double val;
-  while(!feof(pf)){
-    int res = fscanf(pf, "%99s %lf", name, &val);
-    if(res != 2){
-      if(res <= 0)break;
-      fprintf(stderr, "Incorrect file [%s] [%s]\n", fname, name); break;
-    }
-    if(strcmp(name, "Haniz")==0){
-      Haniz = val;
-    }else if(strcmp(name, "Hc")==0){
-      Hc = val;
-    }else if(strcmp(name, "I_angle")==0){
-      current_angle_deg = val;
-    }else if(strcmp(name, "H_angle")==0){
-      H_angle_deg = val;
-    }else{
-      fprintf(stderr, "Incorrect variable name [%s]\n", name);
-    }
-  }
-  fclose(pf);
-}
-
-void help(char name[]){
-  printf(
-    "Usage: %s [FLAGS]\n"
-    "  -s filename\tLoad initial values from file\n"
-    "  -A field\tSet anisotropy field\n"
-    "  -C field\tSet coercive force\n"
-    "  -F angle\tSet angle between light axis and external field\n"
-    "  -I angle\tSet angle between light axis and current direction\n"
-    "  -m\t\tHide vertical marker\n"
-    "  -h\n"
-    "  --help\tDisplay this help\n"
-    , name
-  );
-}
-
-int mask2bits(unsigned long mask){
-  unsigned long max = (mask &~(mask>>1));
-  unsigned long min = (mask &~(mask<<1));
-  int i = 1;
-  for(;max>min; min<<=1)i++;
-  return i;
-}
-
 int main( int argc, char *argv[]){
-  for(int i=1; i<argc; i++){
-    if(StrEq(argv[i], "-s")){ //settings from file
-      loadfile(argv[i+1]);
-      i++;
-    }else if(StrEq(argv[i], "-A")){ //Haniz
-      sscanf(argv[i+1], "%lf", &Haniz);
-      i++;
-    }else if(StrEq(argv[i], "-C")){ //Hc
-      sscanf(argv[i+1], "%lf", &Hc);
-      i++;
-    }else if(StrEq(argv[i], "-F")){ //angle_field
-      sscanf(argv[i+1], "%lf", &H_angle_deg);
-      i++;
-    }else if(StrEq(argv[i], "-I")){ //angle_current
-      sscanf(argv[i+1], "%lf", &current_angle_deg);
-      i++;
-    }else if(StrEq(argv[i], "-m")){ //marker
-      marker_flag = 0;
-    }else if(StrEq(argv[i], "-h") || StrEq(argv[i], "--help")){ //help
-      help(argv[0]); return 0;
-    }
-  }
-  
-  SDL_Init(SDL_INIT_VIDEO);
-  
-  do{
-    SDL_DisplayMode dmode;
-    SDL_GetCurrentDisplayMode(0, &dmode);
-    int bpp;
-    Uint32 rmask,gmask,bmask,amask;
-    SDL_PixelFormatEnumToMasks(dmode.format, &bpp, &rmask, &gmask, &bmask, &amask);
-    
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,  mask2bits(rmask));
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,mask2bits(gmask));
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, mask2bits(bmask));
-  }while(0);
-  
-  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-  
   wnd_sdl = SDL_CreateWindow("Hall model",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,
                             wnd_w, wnd_h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-  
-  
   context=SDL_GL_CreateContext(wnd_sdl);
   SDL_GL_MakeCurrent(wnd_sdl, context);
   

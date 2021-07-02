@@ -15,11 +15,11 @@
 SDL_Window *wnd_sdl;
 SDL_GLContext context;
 volatile char exitflag = 0;
-int wnd_w = 500; //ширина окна (в пикселях)
+int wnd_w = 700; //ширина окна (в пикселях)
 int wnd_h = 900; //высота окна (в пикселях)
 
-int bmp_w = 500; //ширина bmp (в пикселях)
-int bmp_h = 1000; //высота bmp (в пикселях)
+int bmp_w = 450; //ширина bmp (в пикселях)
+int bmp_h = 600; //высота bmp (в пикселях)
 double bmp_w_m = 0.1; //ширина bmp (в метрах)
 
 const double field_max = 1000; //максимальное внешнее поле
@@ -31,11 +31,7 @@ double current_angle_deg = -30; //угол между легкой осью и �
 const double linewidth = 2;
 char marker_flag = 1;
 
-struct{
-  float min, max;
-}magen;
-
-double calc_p(double H){
+double clac_p(double H){
   return H/Haniz;
 }
 double mag_energy(double phi, double alp, double p){
@@ -139,41 +135,6 @@ void draw_surface(float alp){
   
   glPopMatrix();
 }
-void draw_surface_lin(){
-  glPushMatrix();
-  //magen = [-p-1 .. p]
-  float max = calc_p(field_max);
-  float min = -max-1;
-  //max=0;
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(0,NPOINTS, min,max);
-  glLineWidth(1);
-
-  glColor3f(0,0,0);
-  glBegin(GL_LINE_STRIP);
-    for(int i=0; i<NPOINTS+1; i++){
-      glVertex2f(i, yval[i]);
-    }
-  glEnd();
-  glBegin(GL_LINES);
-    glColor3f(0, 0, 1);
-    glVertex2f(idxmin2 - NPOINTS/5, yval[idxmin2]);
-    glVertex2f(idxmin2 + NPOINTS/5, yval[idxmin2]);
-  
-    glColor3f(0, 1, 0);
-    glVertex2f(0, yval[idxmin1]);
-    glVertex2f(NPOINTS, yval[idxmin1]);
-    
-    
-  glEnd();
-  
-  glLineWidth(1);
-  
-  glPopMatrix();
-}
-
 //double mag_energy(double phi, double alp, double p)
 double findmin(double x1, double x2, double alp, double p){
   if(p<0){alp+=M_PI; p=-p;}
@@ -209,10 +170,10 @@ void calc_graph(){
   double alp = H_angle_deg*M_PI/180;
   char sign = 1;
   if(cos(alp)<0)sign=-1;
-  double p = calc_p((i-XPOINTS/2)*field_max*2/XPOINTS);
+  double p = clac_p((i-XPOINTS/2)*field_max*2/XPOINTS);
 
   for(i=0; i<XPOINTS; i++){
-    p = calc_p((i-XPOINTS/2)*field_max*2/XPOINTS);
+    p = clac_p((i-XPOINTS/2)*field_max*2/XPOINTS);
     if(sign*p > 0){
       minangle[i][0] = findmin(-M_PI/2, M_PI/2, alp, p);
       if(minangle[i][0] < 0)minangle[i][0] += 2*M_PI;
@@ -225,26 +186,7 @@ void calc_graph(){
 
 void draw_graph(double H, char rise){
   double IAangle = current_angle_deg*M_PI/180;
-  int dh = (wnd_h-wnd_w)/2;
-  
-  glViewport(0,wnd_w, wnd_w, dh);
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluOrtho2D(0,1, 0,1);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  glColor3f(0.9, 0.9, 0.9);
-  glBegin(GL_TRIANGLE_FAN);
-    glVertex2f(0,0);
-    glVertex2f(0,1);
-    glVertex2f(1,1);
-    glVertex2f(1,0);
-  glEnd();
-  
-  draw_surface_lin();
-  
-  glViewport(0,wnd_w+dh, wnd_w, dh);
-  //glViewport(0,wnd_w, wnd_w, wnd_h-wnd_w);
+  glViewport(0,wnd_w, wnd_w, wnd_h-wnd_w);
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -253,7 +195,7 @@ void draw_graph(double H, char rise){
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   glLineWidth(linewidth);
-  glColor3f(0,0,1);
+  glColor3f(0,1,0);
   glBegin(GL_LINE_STRIP);
     for(int i=0; i<XPOINTS; i++)
       glVertex2f(i, sin(2*(IAangle -minangle[i][1])));
@@ -280,15 +222,19 @@ void draw_graph(double H, char rise){
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluOrtho2D(-field_max, field_max, -1.02, 1.02);
-
+    /*glBegin(GL_LINES);
+      glVertex2f(H, -1.03);
+      glVertex2f(H, 1.03);
+    glEnd();
+    */
     int Hci = XPOINTS/2 - XPOINTS*H/field_max/2;
     int minnum = 0;
     if((H>-Hc) && (H<Hc)){
       if(rise && (H>0))minnum = 1;
       if(!rise &&(H<0))minnum = 1;
     }
-    const float size = 40;
-    float dx = (size/wnd_w)*field_max/2;
+    const float size = 20;
+    float dx = (size/wnd_w)*field_max;
     float dy = (size/(wnd_h-wnd_w));
     float y = sin(2*(IAangle -minangle[XPOINTS - Hci][minnum]));
     glBegin(GL_LINE_STRIP);
@@ -504,7 +450,7 @@ void draw(){
   static char rise = 0;
   double dH = dfield;
   
-  calc_points(H_angle_deg*M_PI/180, calc_p(H));
+  calc_points(H_angle_deg*M_PI/180, clac_p(H));
   draw_model(H, rise);
   draw_graph(H, rise);
   if(rise){
@@ -624,15 +570,13 @@ void sbtn_click(GtkButton *button, gpointer user_data){
   int i = 0;
   while(1){
     glClear(GL_COLOR_BUFFER_BIT);
-    calc_points(H_angle_deg*M_PI/180, calc_p(H));
+    calc_points(H_angle_deg*M_PI/180, clac_p(H));
     draw_model(H, rise);
     draw_graph(H, rise);
     if(rise){
-      if( (H>-dH) && (H<Hc*1.5+dH) )H += dH/10; else
       H += dH;
       if(H >= field_max){H = field_max; rise = 0;}
     }else{
-      if( (H<dH) && (H>(-1.5*Hc-dH)) )H-=dH/10; else
       H -= dH;
       if(H<-field_max)break;
     }
@@ -660,103 +604,9 @@ void sbtn_click(GtkButton *button, gpointer user_data){
 #endif
 }
 
-#define StrEq(str, eq) (strncmp(str, eq, sizeof(eq)) == 0)
-void loadfile(char fname[]){
-  FILE *pf = fopen(fname, "rt");
-  if(pf == NULL){
-    fprintf(stderr, "Can not open file [%s]\n", fname); return;
-  }
-  char name[20];
-  double val;
-  while(!feof(pf)){
-    int res = fscanf(pf, "%99s %lf", name, &val);
-    if(res != 2){
-      if(res <= 0)break;
-      fprintf(stderr, "Incorrect file [%s] [%s]\n", fname, name); break;
-    }
-    if(strcmp(name, "Haniz")==0){
-      Haniz = val;
-    }else if(strcmp(name, "Hc")==0){
-      Hc = val;
-    }else if(strcmp(name, "I_angle")==0){
-      current_angle_deg = val;
-    }else if(strcmp(name, "H_angle")==0){
-      H_angle_deg = val;
-    }else{
-      fprintf(stderr, "Incorrect variable name [%s]\n", name);
-    }
-  }
-  fclose(pf);
-}
-
-void help(char name[]){
-  printf(
-    "Usage: %s [FLAGS]\n"
-    "  -s filename\tLoad initial values from file\n"
-    "  -A field\tSet anisotropy field\n"
-    "  -C field\tSet coercive force\n"
-    "  -F angle\tSet angle between light axis and external field\n"
-    "  -I angle\tSet angle between light axis and current direction\n"
-    "  -m\t\tHide vertical marker\n"
-    "  -h\n"
-    "  --help\tDisplay this help\n"
-    , name
-  );
-}
-
-int mask2bits(unsigned long mask){
-  unsigned long max = (mask &~(mask>>1));
-  unsigned long min = (mask &~(mask<<1));
-  int i = 1;
-  for(;max>min; min<<=1)i++;
-  return i;
-}
-
 int main( int argc, char *argv[]){
-  for(int i=1; i<argc; i++){
-    if(StrEq(argv[i], "-s")){ //settings from file
-      loadfile(argv[i+1]);
-      i++;
-    }else if(StrEq(argv[i], "-A")){ //Haniz
-      sscanf(argv[i+1], "%lf", &Haniz);
-      i++;
-    }else if(StrEq(argv[i], "-C")){ //Hc
-      sscanf(argv[i+1], "%lf", &Hc);
-      i++;
-    }else if(StrEq(argv[i], "-F")){ //angle_field
-      sscanf(argv[i+1], "%lf", &H_angle_deg);
-      i++;
-    }else if(StrEq(argv[i], "-I")){ //angle_current
-      sscanf(argv[i+1], "%lf", &current_angle_deg);
-      i++;
-    }else if(StrEq(argv[i], "-m")){ //marker
-      marker_flag = 0;
-    }else if(StrEq(argv[i], "-h") || StrEq(argv[i], "--help")){ //help
-      help(argv[0]); return 0;
-    }
-  }
-  
-  SDL_Init(SDL_INIT_VIDEO);
-  
-  do{
-    SDL_DisplayMode dmode;
-    SDL_GetCurrentDisplayMode(0, &dmode);
-    int bpp;
-    Uint32 rmask,gmask,bmask,amask;
-    SDL_PixelFormatEnumToMasks(dmode.format, &bpp, &rmask, &gmask, &bmask, &amask);
-    
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE,  mask2bits(rmask));
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE,mask2bits(gmask));
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, mask2bits(bmask));
-  }while(0);
-  
-  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-  
   wnd_sdl = SDL_CreateWindow("Hall model",SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,
                             wnd_w, wnd_h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-  
-  
   context=SDL_GL_CreateContext(wnd_sdl);
   SDL_GL_MakeCurrent(wnd_sdl, context);
   
@@ -843,7 +693,7 @@ int main( int argc, char *argv[]){
     draw();
     glFlush();
     SDL_GL_SwapWindow(wnd_sdl);
-    usleep(10000);
+    //usleep(10000);
   }
   printf("\n");
   return 0;
